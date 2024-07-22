@@ -1,6 +1,5 @@
 package jdbc;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,30 +19,27 @@ public class SimpleJDBCRepository {
     private PreparedStatement ps = null;
     private Statement st = null;
 
-    private static final String createUserSQL = "Insert into myusers (firstName, lastName, age) values (?, ?, ?)";
-    private static final String updateUserSQL = "update myusers set firstName = ?, lastName = ?, age = ?";
-    private static final String deleteUser = "delete from myusers where id = ?";
-    private static final String findUserByIdSQL = "select * from myusers where id = ?";
-    private static final String findUserByNameSQL = "select * from myusers where name = ?";
-    private static final String findAllUserSQL = "select * from myusers";
+    private static final String createUserSQL = "INSERT INTO myusers (firstname, lastname, age) VALUES(?,?,?)";
+    private static final String updateUserSQL = "UPDATE myusers SET firstname = ?, lastname = ?, age = ? WHERE id = ?";
+    private static final String deleteUser = "DELETE FROM myusers WHERE id=?";
+    private static final String findUserByIdSQL = "SELECT * FROM myusers WHERE ID=?";
+    private static final String findUserByNameSQL = "SELECT * FROM myusers where firstname=?";
+    private static final String findAllUserSQL = "SELECT * FROM myusers;";
 
     public Long createUser(User user) {
         Long result = null;
-        try(Connection connection = CustomDataSource.getInstance().getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS)){
-            preparedStatement.setString(1, user.getFirstName());
-            preparedStatement.setString(2, user.getLastName());
-            preparedStatement.setInt(3, user.getAge());
-            preparedStatement.execute();
-            try(ResultSet rs = preparedStatement.getGeneratedKeys()){
-                while (rs.next()){
-                    result = rs.getLong(1);
-                }
-            }catch (Exception e){
-                e.printStackTrace();
+        try (Connection connection = CustomDataSource.getInstance().getConnection();
+             PreparedStatement ps = connection.prepareStatement(createUserSQL, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, user.getFirstName());
+            ps.setString(2, user.getLastName());
+            ps.setInt(3, user.getAge());
+            ps.executeUpdate();
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) {
+                result = rs.getLong(1);
             }
-        }catch (Exception e){
-            e.printStackTrace();
+        } catch (Exception s) {
+            s.printStackTrace();
         }
         return result;
     }
@@ -88,39 +84,38 @@ public class SimpleJDBCRepository {
 
     public List<User> findAllUser() {
         List<User> users = new ArrayList<>();
-        try(Connection connection = CustomDataSource.getInstance().getConnection();
-        PreparedStatement preparedStatement = connection.prepareStatement(findAllUserSQL)){
-            ResultSet rs = preparedStatement.executeQuery();
-            while(rs.next()){
+        try (Connection connection = CustomDataSource.getInstance().getConnection();
+             PreparedStatement ps = connection.prepareStatement(findAllUserSQL)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                long id = rs.getLong("id");
                 String firstname = rs.getString("firstname");
                 String lastname = rs.getString("lastname");
                 int age = rs.getInt("age");
-                Long id = Long.parseLong(rs.getString("id"));
                 users.add(new User(id, firstname, lastname, age));
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return users;
     }
 
     public User updateUser(User user) {
-        try(Connection connection = CustomDataSource.getInstance().getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(updateUserSQL)){
+        try (Connection connection = CustomDataSource.getInstance().getConnection();
+             PreparedStatement ps = connection.prepareStatement(updateUserSQL)) {
             ps.setString(1, user.getFirstName());
             ps.setString(2, user.getLastName());
-            ps.setLong(3, user.getId());
-            ps.setInt(4, user.getAge());
-            if(ps.executeUpdate() == 0){
-                throw new Exception("No such user exist");
-            }
-    } catch (Exception e) {
-        e.printStackTrace();
+            ps.setInt(3, user.getAge());
+            ps.setLong(4, user.getId());
+            if (ps.executeUpdate() == 0)
+                throw new SQLException("No such user exists");
+        } catch (Exception throwables) {
+            throwables.printStackTrace();
         }
         return user;
     }
 
-    private void deleteUser(Long userId) {
+    public void deleteUser(Long userId) {
         try (Connection connection = CustomDataSource.getInstance().getConnection();
              PreparedStatement ps = connection.prepareStatement(deleteUser)) {
             ps.setLong(1, userId);
